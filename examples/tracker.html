@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head><title>TUIO Client plugin test</title>
+<style type="text/css">
+body { margin: 0px; overflow: hidden; }
+canvas { border: 1px solid black; }
+
+.touchobject{
+	position: absolute;
+	border:1px solid black;
+	color:#fff;
+	width:50px;
+	height:50px;
+}
+
+#box1{
+	top:50px;
+	left:50px;
+	background-color:green;
+}
+
+#box2{
+	right:100px;
+	bottom:50px;
+	background-color:red;
+}
+
+</style>
+<script type="text/javascript" src="https://code.jquery.com/jquery-2.1.4.min.js"></script>
+<script type="text/javascript" src="../lib/tuio.js"></script>
+<script type="text/javascript">
+
+var objs = [];
+
+tuio.cursor_add(function(data) {
+	objs[data.fid] = {
+		path:[{
+			x:data.x, 
+			y:data.y
+		}],
+		time:Date.parse(new Date())
+	};
+});
+
+tuio.cursor_update(function(data){
+
+	objs[data.fid].path.push({
+		x:data.x,
+		y:data.y
+	});
+
+});
+
+tuio.cursor_remove(function(data) {
+	
+	//Check if it was long / short enough for a tap
+	var span = Date.parse(new Date()) - objs[data.fid].time;
+
+	if(span < 3000){
+
+		//Check if object did not move
+		//We could also check only first and last
+		//Or we could check every third point to speed things up
+		var dist = 0;
+		for (var i=0;i<objs[data.fid].path.length;i++) {
+			var p = objs[data.fid].path[i];
+			for (var j=0;j<objs[data.fid].path.length;j++) {
+				if(i!=j){
+					var pp = objs[data.fid].path[j];
+					var t_dist = Math.sqrt( (pp.x-p.x)*pp.x + (pp.y-p.y)*pp.y );
+					if(t_dist > dist){
+						dist = t_dist;
+					} 
+				}
+			}
+		}
+
+		if(dist < 0.2){
+			console.log("CLICK EVENT");
+
+			var cx = data.x*window.innerWidth;
+			var cy = data.y*window.innerHeight;
+
+			$('.touchobject').each(function(i){
+				var ox = $(this).offset().left;
+				var oy = $(this).offset().top;
+				var ow = $(this).width();
+				var oh = $(this).height();
+
+				if((cx > ox && cx < ox+ow) && (cy > oy && cy < oy+oh)){
+					console.log($(this).attr("id"));
+				}
+
+			});
+
+
+		}
+	}  	
+});
+
+
+
+
+/* DRAW THE CANVAS STUFF */
+
+var canvas;
+var ctx;
+var w = 0;
+var h = 0;
+
+var timer;
+var updateStarted = false;
+
+function update() {
+	if (updateStarted) return;
+	updateStarted = true;
+
+	var nw = window.innerWidth;
+	var nh = window.innerHeight;
+
+	if ((w != nw) || (h != nh)) {
+		w = nw;
+		h = nh;
+		canvas.style.width = w+'px';
+		canvas.style.height = h+'px';
+		canvas.width = w;
+		canvas.height = h;
+	}
+
+	ctx.clearRect(0, 0, w, h);
+
+	var i, len = tuio.cursors.length;
+	for (i=0; i<len; i++) {
+		var obj = tuio.cursors[i];
+		var x = obj.x;
+		var y = obj.y;
+		var px = x * w;
+		var py = y * h;
+
+		ctx.beginPath();
+		ctx.arc(px, py, 20, 0, 2*Math.PI, true);
+
+		ctx.fillStyle = "rgba(0, 0, 200, 0.2)";
+		ctx.fill();
+
+		ctx.lineWidth = 2.0;
+		ctx.strokeStyle = "rgba(0, 0, 200, 0.8)";
+		ctx.stroke();
+	}
+
+	updateStarted = false;
+}
+
+function ol() {
+	canvas = document.getElementById('canvas');
+	ctx = canvas.getContext('2d');
+	timer = setInterval(update, 15);
+};
+
+</script>
+</head>
+<body onload="ol()">
+	
+<canvas id="canvas" width="300" height="300" style="top:0px; left:0px; width: 300px; height: 300px;"></canvas>
+<object id="tuio" type="application/x-tuio">Plugin FAILED to load</object>
+
+<div class="touchobject" id="box1">BOX 1</div>
+<div class="touchobject" id="box2">BOX 2</div>
+
+</body>
+</html>
